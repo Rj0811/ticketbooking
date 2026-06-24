@@ -1,73 +1,49 @@
 # Flight Ticket Booking API
 
-A lightweight REST API for flight ticket booking, built with **Spring Boot 3.3** and **Java 17**.
+A REST API for booking flight tickets. Built with **Spring Boot 3.4** and **Java 17**, using in-memory storage.
 
-## Features
+## How to Run
 
-- **Book flights** — Reserve a seat on a known flight
-- **Cancel bookings** — Free up a seat by cancelling a booking
-- **Create flights** — Seed new flights via API
-- **Overbooking prevention** — Thread-safe seat allocation ensures no flight is overbooked
-- **In-memory storage** — No database required, uses `ConcurrentHashMap`
-
-## Tech Stack
-
-- Java 17
-- Spring Boot 3.3.0
-- Maven (wrapper included)
-- JUnit 5 + MockMvc for testing
-
-## Getting Started
-
-### Prerequisites
-
-- Java 17+
-
-### Run the application
+**Prerequisites:** Java 17+
 
 ```bash
-./mvnw spring-boot:run
+# Clone
+git clone https://github.com/Rj0811/ticketbooking.git
+cd ticketbooking
+
+# Run
+./mvnw.cmd spring-boot:run        # Windows
+./mvnw spring-boot:run             # macOS/Linux
+
+# Run tests
+./mvnw.cmd test
 ```
 
-The API will start on `http://localhost:8080`.
+The API starts on `http://localhost:8080`.
 
-### Run tests
+> On Windows, if `JAVA_HOME` is not set: `$env:JAVA_HOME = "C:\Program Files\Java\jdk-17"`
+
+## Example Requests
+
+### Create a flight
 
 ```bash
-./mvnw test
+curl -X POST http://localhost:8080/api/flights \
+  -H "Content-Type: application/json" \
+  -d '{"flightNumber":"AA101","origin":"New York","destination":"Los Angeles","departureTime":"2026-07-01T08:00:00","totalSeats":150}'
 ```
 
-## API Endpoints
+→ `201 Created`
 
-### Create a Flight
+### Book a seat
 
 ```bash
-POST /api/flights
-Content-Type: application/json
-
-{
-  "flightNumber": "AA101",
-  "origin": "New York",
-  "destination": "Los Angeles",
-  "departureTime": "2026-07-01T08:00:00",
-  "totalSeats": 150
-}
+curl -X POST http://localhost:8080/api/flights/AA101/bookings \
+  -H "Content-Type: application/json" \
+  -d '{"passengerName":"John Doe"}'
 ```
 
-**Response:** `201 Created`
-
-### Book a Seat
-
-```bash
-POST /api/flights/{flightNumber}/bookings
-Content-Type: application/json
-
-{
-  "passengerName": "John Doe"
-}
-```
-
-**Response:** `201 Created`
+→ `201 Created`
 ```json
 {
   "bookingId": "550e8400-e29b-41d4-a716-446655440000",
@@ -77,69 +53,28 @@ Content-Type: application/json
 }
 ```
 
-### Cancel a Booking
+### Cancel a booking
 
 ```bash
-DELETE /api/flights/{flightNumber}/bookings/{bookingId}
+curl -X DELETE http://localhost:8080/api/flights/AA101/bookings/{bookingId}
 ```
 
-**Response:** `204 No Content`
+→ `204 No Content`
 
-## Pre-loaded Sample Flights
+### Error examples
 
-The app starts with 3 sample flights:
+Booking a full flight → `409 Conflict`  
+Unknown flight number → `404 Not Found`  
+Missing passenger name → `400 Bad Request`
 
-| Flight | Route | Seats |
-|--------|-------|-------|
-| AA101 | New York → Los Angeles | 150 |
-| BA202 | London → Paris | 200 |
-| EK303 | Dubai → Singapore | 100 |
+> **Note:** Three sample flights (AA101, BA202, EK303) are pre-loaded on startup.
 
-## Error Responses
+## What I Would Improve With More Time
 
-All errors return a consistent JSON format:
-
-```json
-{
-  "status": 404,
-  "error": "Not Found",
-  "message": "Flight not found: XX999",
-  "timestamp": "2026-06-24T10:30:00"
-}
-```
-
-| Status | Condition |
-|--------|-----------|
-| `400` | Invalid request body (validation errors) |
-| `404` | Flight or booking not found |
-| `409` | Flight already exists / No seats available |
-
-## Project Structure
-
-```
-src/main/java/com/ebay/ticketbooking/
-├── TicketBookingApplication.java     # Application entry point
-├── controller/
-│   └── FlightBookingController.java  # REST endpoints
-├── service/
-│   └── BookingService.java           # Business logic
-├── repository/
-│   ├── FlightRepository.java         # In-memory flight store
-│   └── BookingRepository.java        # In-memory booking store
-├── model/
-│   ├── Flight.java                   # Flight domain model
-│   └── Booking.java                  # Booking domain model
-├── dto/
-│   ├── FlightRequest.java            # Flight creation request
-│   ├── BookingRequest.java           # Booking request
-│   ├── BookingResponse.java          # Booking confirmation
-│   └── ErrorResponse.java           # Error response format
-├── exception/
-│   ├── FlightNotFoundException.java
-│   ├── FlightFullException.java
-│   ├── BookingNotFoundException.java
-│   ├── FlightAlreadyExistsException.java
-│   └── GlobalExceptionHandler.java   # Maps exceptions → HTTP status
-└── config/
-    └── DataSeeder.java               # Seeds sample flights on startup
-```
+- **Persistent storage** — Replace in-memory maps with a database (e.g. H2/PostgreSQL) so data survives restarts
+- **Idempotency** — Add an idempotency key header on `POST /bookings` to prevent duplicate bookings on client retries
+- **Input sanitization** — Enforce flight number format (regex), passenger name length limits, and XSS protection beyond Bean Validation
+- **Horizontal scalability** — The current `synchronized(flight)` approach only works in a single JVM; would need optimistic locking or DB-level constraints for multiple instances
+- **Observability** — Structured logging with correlation IDs, request/response logging, health check and metrics endpoints
+- **Authorization on cancel** — Currently anyone with a booking ID can cancel; would add a booking token or auth layer
+- **API polish** — Pagination for listing flights, HATEOAS links, OpenAPI/Swagger documentation
