@@ -3,6 +3,7 @@ package com.ebay.ticketbooking.service;
 import com.ebay.ticketbooking.dto.BookingRequest;
 import com.ebay.ticketbooking.dto.BookingResponse;
 import com.ebay.ticketbooking.dto.FlightRequest;
+import com.ebay.ticketbooking.dto.FlightResponse;
 import com.ebay.ticketbooking.exception.BookingNotFoundException;
 import com.ebay.ticketbooking.exception.FlightAlreadyExistsException;
 import com.ebay.ticketbooking.exception.FlightFullException;
@@ -15,8 +16,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -51,14 +50,14 @@ class BookingServiceTest {
                 LocalDateTime.of(2026, 7, 1, 8, 0), 150
         );
 
-        Flight flight = bookingService.createFlight(request);
+        FlightResponse response = bookingService.createFlight(request);
 
-        assertNotNull(flight);
-        assertEquals("AA101", flight.getFlightNumber());
-        assertEquals("New York", flight.getOrigin());
-        assertEquals("Los Angeles", flight.getDestination());
-        assertEquals(150, flight.getTotalSeats());
-        assertEquals(0, flight.getBookedSeats());
+        assertNotNull(response);
+        assertEquals("AA101", response.flightNumber());
+        assertEquals("New York", response.origin());
+        assertEquals("Los Angeles", response.destination());
+        assertEquals(150, response.totalSeats());
+        assertEquals(150, response.availableSeats());
     }
 
     @Test
@@ -138,7 +137,8 @@ class BookingServiceTest {
         seedFlight("AA101", totalSeats);
 
         ExecutorService executor = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(concurrentRequests);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(concurrentRequests);
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
@@ -146,18 +146,22 @@ class BookingServiceTest {
             final int passengerNum = i;
             executor.submit(() -> {
                 try {
+                    startGate.await(); // ensure all threads start together
                     bookingService.bookFlight("AA101",
                             new BookingRequest("Passenger " + passengerNum));
                     successCount.incrementAndGet();
                 } catch (FlightFullException e) {
                     failureCount.incrementAndGet();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 } finally {
-                    latch.countDown();
+                    doneLatch.countDown();
                 }
             });
         }
 
-        latch.await();
+        startGate.countDown(); // release all threads simultaneously
+        doneLatch.await();
         executor.shutdown();
 
         assertEquals(totalSeats, successCount.get(),
@@ -232,6 +236,26 @@ class BookingServiceTest {
 
         assertNotNull(newBooking);
         assertEquals("Jane Smith", newBooking.passengerName());
+    }
+
+    @Test
+    @DisplayName("Should prevent double-cancel of same booking")
+    void cancelBooking_doubleCancelThrows() {
+        seedFlight("AA101", 5);
+
+        BookingResponse booking = bookingService.bookFlight("AA101",
+                new BookingRequest("John Doe"));
+
+        bookingService.cancelBooking("AA101", booking.bookingId());
+
+        // Second cancel should throw, not silently decrement seats
+        assertThrows(BookingNotFoundException.class, () ->
+                bookingService.cancelBooking("AA101", booking.bookingId())
+        );
+
+        // Verify seat count is correct (1 booked, 1 cancelled = 0)
+        Flight flight = flightRepository.findByFlightNumber("AA101").orElseThrow();
+        assertEquals(0, flight.getBookedSeats());
     }
 
     // --- Helper ---

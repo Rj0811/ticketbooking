@@ -3,8 +3,8 @@ package com.ebay.ticketbooking.controller;
 import com.ebay.ticketbooking.dto.BookingRequest;
 import com.ebay.ticketbooking.dto.BookingResponse;
 import com.ebay.ticketbooking.dto.FlightRequest;
+import com.ebay.ticketbooking.dto.FlightResponse;
 import com.ebay.ticketbooking.exception.*;
-import com.ebay.ticketbooking.model.Flight;
 import com.ebay.ticketbooking.service.BookingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -13,8 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -56,17 +56,20 @@ class FlightBookingControllerTest {
                 LocalDateTime.of(2026, 7, 1, 8, 0), 150
         );
 
-        Flight flight = new Flight("AA101", "New York", "Los Angeles",
-                LocalDateTime.of(2026, 7, 1, 8, 0), 150);
+        FlightResponse response = new FlightResponse(
+                "AA101", "New York", "Los Angeles",
+                LocalDateTime.of(2026, 7, 1, 8, 0), 150, 150
+        );
 
-        when(bookingService.createFlight(any(FlightRequest.class))).thenReturn(flight);
+        when(bookingService.createFlight(any(FlightRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/flights")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.flightNumber").value("AA101"))
-                .andExpect(jsonPath("$.totalSeats").value(150));
+                .andExpect(jsonPath("$.totalSeats").value(150))
+                .andExpect(jsonPath("$.availableSeats").value(150));
     }
 
     @Test

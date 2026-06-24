@@ -1,12 +1,16 @@
 package com.ebay.ticketbooking.model;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Represents a flight with a fixed seat capacity.
- * Uses AtomicInteger for bookedSeats to support thread-safe reads,
- * though actual booking logic uses synchronized blocks for atomicity.
+ *
+ * Thread safety: all mutable state (bookedSeats) must be accessed
+ * while holding the intrinsic lock on this Flight instance.
+ * The field is a plain int — AtomicInteger was removed because every
+ * access already requires the synchronized block for check-then-act
+ * atomicity, so the atomic wrapper added no value and gave false
+ * confidence that individual calls were safe without locking.
  */
 public class Flight {
 
@@ -15,16 +19,19 @@ public class Flight {
     private final String destination;
     private final LocalDateTime departureTime;
     private final int totalSeats;
-    private final AtomicInteger bookedSeats;
+    private int bookedSeats;  // guarded by synchronized(this)
 
     public Flight(String flightNumber, String origin, String destination,
                   LocalDateTime departureTime, int totalSeats) {
+        if (totalSeats < 1) {
+            throw new IllegalArgumentException("totalSeats must be >= 1");
+        }
         this.flightNumber = flightNumber;
         this.origin = origin;
         this.destination = destination;
         this.departureTime = departureTime;
         this.totalSeats = totalSeats;
-        this.bookedSeats = new AtomicInteger(0);
+        this.bookedSeats = 0;
     }
 
     public String getFlightNumber() {
@@ -48,18 +55,37 @@ public class Flight {
     }
 
     public int getBookedSeats() {
-        return bookedSeats.get();
+        return bookedSeats;
     }
 
     public int getAvailableSeats() {
-        return totalSeats - bookedSeats.get();
+        return totalSeats - bookedSeats;
     }
 
-    public void incrementBookedSeats() {
-        bookedSeats.incrementAndGet();
+    /**
+     * Attempts to reserve one seat. Returns true if successful,
+     * false if the flight is already full.
+     * Caller MUST hold synchronized(this).
+     */
+    public boolean tryReserveSeat() {
+        if (bookedSeats >= totalSeats) {
+            return false;
+        }
+        bookedSeats++;
+        return true;
     }
 
-    public void decrementBookedSeats() {
-        bookedSeats.decrementAndGet();
+    /**
+     * Releases one previously reserved seat.
+     * Caller MUST hold synchronized(this).
+     *
+     * @throws IllegalStateException if bookedSeats is already 0
+     */
+    public void releaseSeat() {
+        if (bookedSeats <= 0) {
+            throw new IllegalStateException(
+                    "Cannot release seat: no booked seats on flight " + flightNumber);
+        }
+        bookedSeats--;
     }
 }

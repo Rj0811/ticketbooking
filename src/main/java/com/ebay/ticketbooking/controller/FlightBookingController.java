@@ -3,7 +3,7 @@ package com.ebay.ticketbooking.controller;
 import com.ebay.ticketbooking.dto.BookingRequest;
 import com.ebay.ticketbooking.dto.BookingResponse;
 import com.ebay.ticketbooking.dto.FlightRequest;
-import com.ebay.ticketbooking.model.Flight;
+import com.ebay.ticketbooking.dto.FlightResponse;
 import com.ebay.ticketbooking.service.BookingService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.*;
  * REST controller exposing flight booking operations.
  *
  * Endpoints:
- *   POST   /api/flights                                  - Create/seed a flight
- *   POST   /api/flights/{flightNumber}/bookings           - Book a seat
- *   DELETE  /api/flights/{flightNumber}/bookings/{bookingId} - Cancel a booking
+ *   POST    /api/flights                                     - Create/seed a flight
+ *   POST    /api/flights/{flightNumber}/bookings              - Book a seat
+ *   DELETE  /api/flights/{flightNumber}/bookings/{bookingId}  - Cancel a booking
  */
 @RestController
 @RequestMapping("/api/flights")
@@ -35,9 +35,9 @@ public class FlightBookingController {
      * @return 201 Created with the flight details
      */
     @PostMapping
-    public ResponseEntity<Flight> createFlight(@Valid @RequestBody FlightRequest request) {
-        Flight flight = bookingService.createFlight(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(flight);
+    public ResponseEntity<FlightResponse> createFlight(@Valid @RequestBody FlightRequest request) {
+        FlightResponse response = bookingService.createFlight(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**

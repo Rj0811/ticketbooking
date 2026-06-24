@@ -19,8 +19,13 @@ public class FlightRepository {
         return Optional.ofNullable(flights.get(flightNumber));
     }
 
-    public boolean exists(String flightNumber) {
-        return flights.containsKey(flightNumber);
+    /**
+     * Atomically inserts a flight only if no flight with that number exists.
+     *
+     * @return true if inserted, false if the flight number was already present
+     */
+    public boolean saveIfAbsent(Flight flight) {
+        return flights.putIfAbsent(flight.getFlightNumber(), flight) == null;
     }
 
     public Flight save(Flight flight) {

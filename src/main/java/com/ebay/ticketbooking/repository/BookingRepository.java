@@ -24,7 +24,11 @@ public class BookingRepository {
         return booking;
     }
 
-    public void deleteById(String bookingId) {
-        bookings.remove(bookingId);
+    /**
+     * Atomically removes a booking and returns it, or returns null if
+     * it was already removed (prevents double-cancel).
+     */
+    public Booking removeById(String bookingId) {
+        return bookings.remove(bookingId);
     }
 }
